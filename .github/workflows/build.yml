@@ -1,13 +1,12 @@
 name: Build ViolaLauncher
 
-# Give the workflow explicit permission to write repo contents (needed to create releases)
 permissions:
-  contents: write
+  contents: write  # needed for release creation
 
 on:
   push:
     tags:
-      - 'v*'  # triggers workflow on tags like v1.0.0
+      - 'v*'
 
 jobs:
   build:
@@ -33,12 +32,12 @@ jobs:
       - name: Zip executable
         run: |
           mkdir output
-          powershell Compress-Archive -Path dist\viola_launcher.exe -DestinationPath output\ViolaLauncher-$env:GITHUB_REF_NAME.zip
+          powershell Compress-Archive -Path dist\viola_launcher.exe -DestinationPath output\ViolaLauncher-${{ github.ref_name }}.zip
 
       - name: Calculate SHA256
         id: hash
         run: |
-          $hash = Get-FileHash output\ViolaLauncher-$env:GITHUB_REF_NAME.zip -Algorithm SHA256
+          $hash = Get-FileHash output\ViolaLauncher-${{ github.ref_name }}.zip -Algorithm SHA256
           Write-Output "SHA256=$($hash.Hash)" >> $GITHUB_ENV
 
       - name: Update latest.json
@@ -57,6 +56,9 @@ jobs:
 
           Set-Content -Path latest.json -Value $latestJson -Encoding UTF8
 
+      - name: List output folder
+        run: dir output
+
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -70,6 +72,6 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: output/ViolaLauncher-$env:GITHUB_REF_NAME.zip
-          asset_name: ViolaLauncher-$env:GITHUB_REF_NAME.zip
+          asset_path: output/ViolaLauncher-${{ github.ref_name }}.zip
+          asset_name: ViolaLauncher-${{ github.ref_name }}.zip
           asset_content_type: application/zip
