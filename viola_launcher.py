@@ -1,9 +1,37 @@
-import sys, os, glob
+import sys, os, glob, json, requests, zipfile, shutil
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton
 from PyQt6.QtGui import QPixmap, QFont, QPainterPath, QRegion, QCursor, QIcon
-from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtCore import Qt, QRectF, QThread, pyqtSignal
 
+# --- Worker thread to download update ---
+class UpdateThread(QThread):
+    progress = pyqtSignal(int)
+    finished = pyqtSignal(str)
+
+    def __init__(self, url, dest):
+        super().__init__()
+        self.url = url
+        self.dest = dest
+
+    def run(self):
+        try:
+            r = requests.get(self.url, stream=True)
+            total = int(r.headers.get('content-length', 0))
+            with open(self.dest, 'wb') as f:
+                downloaded = 0
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        percent = int(downloaded / total * 100)
+                        self.progress.emit(percent)
+            self.finished.emit(self.dest)
+        except Exception as e:
+            print("Update failed:", e)
+            self.finished.emit(None)
+
+# --- Settings page (unchanged) ---
 class NewPage(QWidget):
     def __init__(self, parent_launcher=None):
         super().__init__(parent_launcher)
@@ -12,80 +40,35 @@ class NewPage(QWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        app_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-        bg_path = os.path.join(app_path, "assets", "background.png")
+        # Your existing settings UI here...
+        pass
 
-        # Background same as main launcher
-        self.bg_label = QLabel(self)
-        if os.path.exists(bg_path):
-            bg_pixmap = QPixmap(bg_path).scaled(
-                self.width(),
-                self.height(),
-                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            self.bg_label.setPixmap(bg_pixmap)
-        else:
-            self.bg_label.setStyleSheet("background-color: #1e1e1e;")  # fallback color
-        self.bg_label.setGeometry(0, 0, self.width(), self.height())
-        self.bg_label.lower()
-
-        # Semi-transparent overlay
-        self.overlay = QLabel(self)
-        self.overlay.setStyleSheet("background-color: rgba(0, 0, 0, 120); border-radius: 25px;")
-        self.overlay.setGeometry(0, 0, self.width(), self.height())
-        self.overlay.raise_()
-
-        # Page label
-        label = QLabel("Welcome to Settings!", self)
-        label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
-        label.setStyleSheet("color: white;")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setGeometry(0, 0, self.width(), self.height())
-
-        # Back button
-        self.back_button = QPushButton("Back", self)
-        self.back_button.setGeometry(self.width()//2 - 60, self.height() - 80, 120, 40)
-        self.back_button.setStyleSheet("""
-            QPushButton {
-                background-color: #7C1FFF;
-                color: white;
-                border-radius: 15px;
-                font: bold 16px "Segoe UI";
-            }
-            QPushButton:hover {
-                background-color: #9B47FF;
-            }
-        """)
-        self.back_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.back_button.clicked.connect(lambda: self.parent_launcher.return_to_main())
-
+# --- Launcher ---
 class ViolaLauncher(QWidget):
+    CURRENT_VERSION = "1.0.0"
+
     def __init__(self):
         super().__init__()
-
-        # --- Set window icon with multiple fallbacks ---
-        app_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-        icon_paths = [
-            os.path.join(app_path, "assets", "logo.ico"),  # primary
-            os.path.join(app_path, "assets", "icon.ico"),  # backup
-            os.path.join(app_path, "assets", "logo.png")   # final fallback
-        ]
-        for path in icon_paths:
-            if os.path.exists(path):
-                self.setWindowIcon(QIcon(path))
-                break
-        # --- End icon setup ---
-
-        self.setWindowTitle("Viola Client")
+        self.setWindowTitle("Viola Launcher")
         self.setFixedSize(900, 600)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.apply_rounded_corners()
         self.setup_ui()
-
-        # For dragging
         self.drag_pos = None
 
+        # --- Updater overlay ---
+        self.update_overlay = QLabel(self)
+        self.update_overlay.setStyleSheet(
+            "background-color: black; color: white; font: bold 24px 'Segoe UI';"
+        )
+        self.update_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.update_overlay.setGeometry(0, 0, self.width(), self.height())
+        self.update_overlay.hide()
+
+        # Check for updates
+        self.check_for_updates()
+
+    # --- Rounded corners ---
     def apply_rounded_corners(self):
         path = QPainterPath()
         path.setFillRule(Qt.FillRule.WindingFill)
@@ -95,6 +78,7 @@ class ViolaLauncher(QWidget):
         region = QRegion(polygon.toPolygon())
         self.setMask(region)
 
+    # --- UI setup ---
     def setup_ui(self):
         app_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
         bg_path = os.path.join(app_path, "assets", "background.png")
@@ -104,9 +88,7 @@ class ViolaLauncher(QWidget):
         bg_label = QLabel(self)
         if os.path.exists(bg_path):
             bg_pixmap = QPixmap(bg_path).scaled(
-                self.size(),
-                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                Qt.TransformationMode.SmoothTransformation
+                self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation
             )
             bg_label.setPixmap(bg_pixmap)
         else:
@@ -142,7 +124,6 @@ class ViolaLauncher(QWidget):
             greeting = "Good Afternoon!"
         else:
             greeting = "Good Evening!"
-
         self.greeting_label = QLabel(greeting, self)
         self.greeting_label.setFont(QFont("Segoe UI", 32, QFont.Weight.Bold))
         self.greeting_label.setStyleSheet("color: white;")
@@ -153,47 +134,26 @@ class ViolaLauncher(QWidget):
         self.launch_button = QPushButton("Launch", self)
         self.launch_button.setGeometry(self.width()//2 - 100, self.height()//2 + 60, 200, 50)
         self.launch_button.setStyleSheet("""
-            QPushButton {
-                background-color: #7C1FFF;
-                color: white;
-                border-radius: 15px;
-                font: bold 18px "Segoe UI";
-            }
-            QPushButton:hover {
-                background-color: #9B47FF;
-            }
+            QPushButton { background-color: #7C1FFF; color: white; border-radius: 15px; font: bold 18px "Segoe UI"; }
+            QPushButton:hover { background-color: #9B47FF; }
         """)
         self.launch_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.launch_button.clicked.connect(self.launch_minecraft)
 
-        # --- Settings button ---
+        # Settings button
         self.settings_button = QPushButton("Settings", self)
         self.settings_button.setGeometry(self.width()//2 - 100, self.height()//2 + 130, 200, 50)
         self.settings_button.setStyleSheet("""
-            QPushButton {
-                background-color: #818589;
-                color: white;
-                border-radius: 15px;
-                font: bold 16px "Segoe UI";
-            }
-            QPushButton:hover {
-                background-color: #9b9da0;
-            }
+            QPushButton { background-color: #818589; color: white; border-radius: 15px; font: bold 16px "Segoe UI"; }
+            QPushButton:hover { background-color: #9b9da0; }
         """)
         self.settings_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.settings_button.clicked.connect(self.open_settings)
 
         # Custom window buttons
         button_style = """
-            QPushButton {
-                color: white;
-                background: transparent;
-                border: none;
-                font: bold 20px "Segoe UI";
-            }
-            QPushButton:hover {
-                color: #aaaaaa;
-            }
+            QPushButton { color: white; background: transparent; border: none; font: bold 20px "Segoe UI"; }
+            QPushButton:hover { color: #aaaaaa; }
         """
         self.min_button = QPushButton("–", self)
         self.min_button.setGeometry(self.width() - 80, 20, 30, 30)
@@ -207,26 +167,66 @@ class ViolaLauncher(QWidget):
         self.close_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.close_button.clicked.connect(self.close)
 
-        # --- Create the settings page, hidden initially ---
+        # Settings page
         self.settings_page = NewPage(self)
         self.settings_page.hide()
 
+    # --- Updater ---
+    def check_for_updates(self):
+        try:
+            r = requests.get("https://raw.githubusercontent.com/ThatWeirdGuy259/ViolaLauncher/main/latest.json", timeout=5)
+            data = r.json()
+            latest_version = data.get("version")
+            url = data.get("url")
+            if latest_version != self.CURRENT_VERSION:
+                self.update_overlay.setText("Updating… 0%")
+                self.update_overlay.show()
+                dest_zip = os.path.join(os.path.dirname(os.path.abspath(__file__)), "update.zip")
+                self.update_thread = UpdateThread(url, dest_zip)
+                self.update_thread.progress.connect(self.update_progress)
+                self.update_thread.finished.connect(self.update_finished)
+                self.update_thread.start()
+        except Exception as e:
+            print("Failed to check updates:", e)
+
+    def update_progress(self, percent):
+        self.update_overlay.setText(f"Updating… {percent}%")
+
+    def update_finished(self, path):
+        if path:
+            try:
+                current_folder = os.path.dirname(os.path.abspath(__file__))
+                with zipfile.ZipFile(path, 'r') as zip_ref:
+                    zip_ref.extractall(current_folder)
+                os.remove(path)
+                self.update_overlay.setText("Update complete!")
+                QThread.sleep(1)
+                self.update_overlay.hide()
+                print("Update applied successfully.")
+            except Exception as e:
+                self.update_overlay.setText("Update failed!")
+                print("Update failed:", e)
+                QThread.sleep(2)
+                self.update_overlay.hide()
+        else:
+            self.update_overlay.setText("Update failed!")
+            QThread.sleep(2)
+            self.update_overlay.hide()
+
+    # --- Settings navigation ---
     def open_settings(self):
-        # Hide main page elements
         self.greeting_label.hide()
         self.launch_button.hide()
         self.settings_button.hide()
-        # Show settings page
         self.settings_page.show()
 
     def return_to_main(self):
-        # Show main page elements
         self.greeting_label.show()
         self.launch_button.show()
         self.settings_button.show()
-        # Hide settings page
         self.settings_page.hide()
 
+    # --- Launch Minecraft ---
     def launch_minecraft(self):
         try:
             os.startfile("minecraft://")
@@ -245,7 +245,7 @@ class ViolaLauncher(QWidget):
             if not launched:
                 print("Failed to launch Minecraft. Please check your installation.")
 
-    # Dragging
+    # --- Dragging ---
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()

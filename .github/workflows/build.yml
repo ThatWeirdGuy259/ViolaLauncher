@@ -1,99 +1,77 @@
 name: Build ViolaLauncher
 
-# Trigger only on tags like v1.0.15
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'  # triggers workflow on tags like v1.0.1
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-      # 1️⃣ Checkout repository
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      # 2️⃣ Setup Python 3.11
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
 
-      # 3️⃣ Install dependencies
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install pyinstaller requests certifi
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pyinstaller requests certifi
 
-      # 4️⃣ Build the launcher .exe
-      - name: Build launcher
-        run: |
-          pyinstaller --noconfirm --onefile --noconsole src/viola_launcher.py
+    - name: Build launcher
+      run: |
+        python -m PyInstaller --noconfirm --onefile --noconsole src/viola_launcher.py
 
-      # 5️⃣ Zip the executable
-      - name: Zip executable
-        run: |
-          mkdir output
-          powershell Compress-Archive -Path dist\viola_launcher.exe -DestinationPath output\ViolaLauncher-${{ github.ref_name }}.zip
+    - name: Zip executable
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path output
+        $exePath = "dist\viola_launcher.exe"
+        if (!(Test-Path $exePath)) { throw "Launcher EXE not found at $exePath" }
+        Compress-Archive -Path $exePath -DestinationPath "output\ViolaLauncher-${env:GITHUB_REF_NAME}.zip"
 
-      # 6️⃣ Calculate SHA256 hash of the ZIP
-      - name: Calculate SHA256
-        id: hash
-        run: |
-          $hash = Get-FileHash output\ViolaLauncher-${{ github.ref_name }}.zip -Algorithm SHA256
-          Write-Output "SHA256=$($hash.Hash)" >> $GITHUB_ENV
+    - name: Calculate SHA256
+      id: hash
+      shell: pwsh
+      run: |
+        $zipPath = "output\ViolaLauncher-${env:GITHUB_REF_NAME}.zip"
+        if (!(Test-Path $zipPath)) { throw "ZIP file not found at $zipPath" }
+        $hash = Get-FileHash $zipPath -Algorithm SHA256
+        echo "SHA256=$($hash.Hash)" >> $env:GITHUB_ENV
 
-      # 7️⃣ Generate latest.json for auto-update
-      - name: Update latest.json
-        shell: pwsh
-        run: |
-          $version = $env:GITHUB_REF_NAME.Substring(1)
-          $url = "https://github.com/${{ github.repository }}/releases/download/$env:GITHUB_REF_NAME/ViolaLauncher-$env:GITHUB_REF_NAME.zip"
-          $sha256 = $env:SHA256
+    - name: Update latest.json
+      shell: pwsh
+      run: |
+        $version = $env:GITHUB_REF_NAME.Substring(1)
+        $url = "https://github.com/${{ github.repository }}/releases/download/${env:GITHUB_REF_NAME}/ViolaLauncher-${env:GITHUB_REF_NAME}.zip"
+        $sha256 = $env:SHA256
 
-          $latestJson = @{
+        $latestObj = [PSCustomObject]@{
             version = $version
             url     = $url
             sha256  = $sha256
             notes   = "Automated build from GitHub Actions."
-          } | ConvertTo-Json -Compress
+        }
+        $latestObj | ConvertTo-Json | Set-Content latest.json -Encoding UTF8
 
-          Set-Content -Path latest.json -Value $latestJson -Encoding UTF8
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v1.3.0
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: ${{ github.ref_name }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 8️⃣ Optional: list output folder for debugging
-      - name: List output folder
-        run: dir output
-
-      # 9️⃣ Create a GitHub Release
-      - name: Create GitHub Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Must match secret name exactly
-
-      # 🔟 Upload latest.json to release
-      - name: Upload latest.json to Release
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: latest.json
-          asset_name: latest.json
-          asset_content_type: application/json
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-
-      # 1️⃣1️⃣ Upload launcher ZIP to release
-      - name: Upload ZIP to Release
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: output/ViolaLauncher-${{ github.ref_name }}.zip
-          asset_name: ViolaLauncher-${{ github.ref_name }}.zip
-          asset_content_type: application/zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+    - name: Upload ZIP to Release
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: output/ViolaLauncher-${{ github.ref_name }}.zip
+        asset_name: ViolaLauncher-${{ github.ref_name }}.zip
+        asset_content_type: application/zip

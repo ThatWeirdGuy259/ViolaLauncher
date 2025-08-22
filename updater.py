@@ -2,7 +2,7 @@ import os, requests, hashlib, zipfile, io, sys
 
 APP_NAME = "ViolaLauncher"
 VERSION = "1.0.0"  # current client version
-MANIFEST_URL = "https://yourserver.com/latest.json"
+MANIFEST_URL = "https://raw.githubusercontent.com/thatweirdguy259/ViolaLauncher/main/latest.json"
 
 def get_app_dir():
     return os.path.join(os.getenv('LOCALAPPDATA'), APP_NAME)
