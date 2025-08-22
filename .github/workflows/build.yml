@@ -1,5 +1,6 @@
 name: Build ViolaLauncher
 
+# Trigger only on tags like v1.0.15
 on:
   push:
     tags:
@@ -10,33 +11,41 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2️⃣ Setup Python 3.11
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install pyinstaller requests certifi
 
+      # 4️⃣ Build the launcher .exe
       - name: Build launcher
         run: |
           pyinstaller --noconfirm --onefile --noconsole src/viola_launcher.py
 
+      # 5️⃣ Zip the executable
       - name: Zip executable
         run: |
           mkdir output
           powershell Compress-Archive -Path dist\viola_launcher.exe -DestinationPath output\ViolaLauncher-${{ github.ref_name }}.zip
 
+      # 6️⃣ Calculate SHA256 hash of the ZIP
       - name: Calculate SHA256
         id: hash
         run: |
           $hash = Get-FileHash output\ViolaLauncher-${{ github.ref_name }}.zip -Algorithm SHA256
           Write-Output "SHA256=$($hash.Hash)" >> $GITHUB_ENV
 
+      # 7️⃣ Generate latest.json for auto-update
       - name: Update latest.json
         shell: pwsh
         run: |
@@ -53,9 +62,11 @@ jobs:
 
           Set-Content -Path latest.json -Value $latestJson -Encoding UTF8
 
+      # 8️⃣ Optional: list output folder for debugging
       - name: List output folder
         run: dir output
 
+      # 9️⃣ Create a GitHub Release
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -63,8 +74,9 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Must match your PAT secret
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Must match secret name exactly
 
+      # 🔟 Upload latest.json to release
       - name: Upload latest.json to Release
         uses: actions/upload-release-asset@v1
         with:
@@ -72,7 +84,10 @@ jobs:
           asset_path: latest.json
           asset_name: latest.json
           asset_content_type: application/json
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
+      # 1️⃣1️⃣ Upload launcher ZIP to release
       - name: Upload ZIP to Release
         uses: actions/upload-release-asset@v1
         with:
@@ -80,3 +95,5 @@ jobs:
           asset_path: output/ViolaLauncher-${{ github.ref_name }}.zip
           asset_name: ViolaLauncher-${{ github.ref_name }}.zip
           asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
