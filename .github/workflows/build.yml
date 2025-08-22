@@ -44,12 +44,12 @@ jobs:
         $url = "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/ViolaLauncher-${GITHUB_REF_NAME}.zip"
         $sha256 = $env:SHA256
 
-        $latestJson = @"
+$latestJson = @"
 {
-  "version": "$version",
-  "url": "$url",
-  "sha256": "$sha256",
-  "notes": "Automated build from GitHub Actions."
+"version": "$version",
+"url": "$url",
+"sha256": "$sha256",
+"notes": "Automated build from GitHub Actions."
 }
 "@
 
