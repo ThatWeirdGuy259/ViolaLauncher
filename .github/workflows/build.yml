@@ -33,22 +33,22 @@ jobs:
         New-Item -ItemType Directory -Force -Path output
         $exePath = "dist\viola_launcher.exe"
         if (!(Test-Path $exePath)) { throw "Launcher EXE not found at $exePath" }
-        Compress-Archive -Path $exePath -DestinationPath "output\ViolaLauncher-${env:GITHUB_REF_NAME}.zip"
+        Compress-Archive -Path $exePath -DestinationPath "output\ViolaLauncher-$env:GITHUB_REF_NAME.zip"
 
     - name: Calculate SHA256
       id: hash
       shell: pwsh
       run: |
-        $zipPath = "output\ViolaLauncher-${env:GITHUB_REF_NAME}.zip"
+        $zipPath = "output\ViolaLauncher-$env:GITHUB_REF_NAME.zip"
         if (!(Test-Path $zipPath)) { throw "ZIP file not found at $zipPath" }
         $hash = Get-FileHash $zipPath -Algorithm SHA256
         echo "SHA256=$($hash.Hash)" >> $env:GITHUB_ENV
 
-    - name: Update latest.json
+    - name: Generate latest.json
       shell: pwsh
       run: |
         $version = $env:GITHUB_REF_NAME.Substring(1)
-        $url = "https://github.com/${{ github.repository }}/releases/download/${env:GITHUB_REF_NAME}/ViolaLauncher-${env:GITHUB_REF_NAME}.zip"
+        $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/ViolaLauncher-$env:GITHUB_REF_NAME.zip"
         $sha256 = $env:SHA256
 
         $latestObj = [PSCustomObject]@{
@@ -59,9 +59,18 @@ jobs:
         }
         $latestObj | ConvertTo-Json | Set-Content latest.json -Encoding UTF8
 
+    - name: Commit latest.json
+      shell: pwsh
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add latest.json
+        git commit -m "Update latest.json for $env:GITHUB_REF_NAME" || echo "No changes to commit"
+        git push
+
     - name: Create GitHub Release
       id: create_release
-      uses: softprops/action-gh-release@v1.3.0
+      uses: softprops/action-gh-release@v2.3.2
       with:
         tag_name: ${{ github.ref_name }}
         name: ${{ github.ref_name }}
@@ -72,6 +81,6 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: output/ViolaLauncher-${{ github.ref_name }}.zip
-        asset_name: ViolaLauncher-${{ github.ref_name }}.zip
+        asset_path: output/ViolaLauncher-$env:GITHUB_REF_NAME.zip
+        asset_name: ViolaLauncher-$env:GITHUB_REF_NAME.zip
         asset_content_type: application/zip

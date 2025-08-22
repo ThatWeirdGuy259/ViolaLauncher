@@ -1,13 +1,13 @@
-import sys, os, glob, json, requests, zipfile, shutil
+import sys, os, glob, json, requests, zipfile, shutil, tempfile, subprocess
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton
 from PyQt6.QtGui import QPixmap, QFont, QPainterPath, QRegion, QCursor, QIcon
-from PyQt6.QtCore import Qt, QRectF, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QRectF, QThread, pyqtSignal, QTimer
 
 # --- Worker thread to download update ---
 class UpdateThread(QThread):
     progress = pyqtSignal(int)
-    finished = pyqtSignal(str)
+    finished = pyqtSignal(bool, str)
 
     def __init__(self, url, dest):
         super().__init__()
@@ -18,20 +18,20 @@ class UpdateThread(QThread):
         try:
             r = requests.get(self.url, stream=True)
             total = int(r.headers.get('content-length', 0))
+            downloaded = 0
             with open(self.dest, 'wb') as f:
-                downloaded = 0
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
                         percent = int(downloaded / total * 100)
                         self.progress.emit(percent)
-            self.finished.emit(self.dest)
+            self.finished.emit(True, self.dest)
         except Exception as e:
             print("Update failed:", e)
-            self.finished.emit(None)
+            self.finished.emit(False, str(e))
 
-# --- Settings page (unchanged) ---
+# --- Settings page ---
 class NewPage(QWidget):
     def __init__(self, parent_launcher=None):
         super().__init__(parent_launcher)
@@ -40,7 +40,7 @@ class NewPage(QWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # Your existing settings UI here...
+        # Your existing settings UI here
         pass
 
 # --- Launcher ---
@@ -179,9 +179,10 @@ class ViolaLauncher(QWidget):
             latest_version = data.get("version")
             url = data.get("url")
             if latest_version != self.CURRENT_VERSION:
+                self.launch_button.setEnabled(False)
                 self.update_overlay.setText("Updating… 0%")
                 self.update_overlay.show()
-                dest_zip = os.path.join(os.path.dirname(os.path.abspath(__file__)), "update.zip")
+                dest_zip = os.path.join(tempfile.gettempdir(), "update.zip")
                 self.update_thread = UpdateThread(url, dest_zip)
                 self.update_thread.progress.connect(self.update_progress)
                 self.update_thread.finished.connect(self.update_finished)
@@ -192,26 +193,28 @@ class ViolaLauncher(QWidget):
     def update_progress(self, percent):
         self.update_overlay.setText(f"Updating… {percent}%")
 
-    def update_finished(self, path):
-        if path:
+    def update_finished(self, success, path):
+        if success and path:
             try:
-                current_folder = os.path.dirname(os.path.abspath(__file__))
                 with zipfile.ZipFile(path, 'r') as zip_ref:
-                    zip_ref.extractall(current_folder)
+                    extract_path = os.path.dirname(sys.executable)
+                    zip_ref.extractall(extract_path)
                 os.remove(path)
                 self.update_overlay.setText("Update complete!")
-                QThread.sleep(1)
-                self.update_overlay.hide()
-                print("Update applied successfully.")
+                QTimer.singleShot(1000, self.restart_launcher)
             except Exception as e:
                 self.update_overlay.setText("Update failed!")
                 print("Update failed:", e)
-                QThread.sleep(2)
-                self.update_overlay.hide()
+                QTimer.singleShot(2000, self.update_overlay.hide)
         else:
             self.update_overlay.setText("Update failed!")
-            QThread.sleep(2)
-            self.update_overlay.hide()
+            QTimer.singleShot(2000, self.update_overlay.hide)
+
+    def restart_launcher(self):
+        launcher_path = os.path.join(os.path.dirname(sys.executable), "viola_launcher.exe")
+        if os.path.exists(launcher_path):
+            subprocess.Popen([launcher_path])
+        self.close()
 
     # --- Settings navigation ---
     def open_settings(self):
