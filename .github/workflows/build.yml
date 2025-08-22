@@ -1,8 +1,5 @@
 name: Build ViolaLauncher
 
-permissions:
-  contents: write  # needed for release creation
-
 on:
   push:
     tags:
@@ -66,7 +63,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Use the PAT secret you added
 
       - name: Upload ZIP to Release
         uses: actions/upload-release-asset@v1
