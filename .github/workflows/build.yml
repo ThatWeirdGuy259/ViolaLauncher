@@ -38,6 +38,7 @@ jobs:
         Write-Output "SHA256=$($hash.Hash)" >> $GITHUB_ENV
 
     - name: Update latest.json
+      shell: pwsh
       run: |
         $version = ${GITHUB_REF_NAME}.Substring(1)
         $url = "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/ViolaLauncher-${GITHUB_REF_NAME}.zip"
