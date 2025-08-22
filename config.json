@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 def _resource_path(rel):
     # supports dev + PyInstaller
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -10,3 +11,17 @@ def load_launcher_config():
             return json.load(f)
     except Exception:
         return {}
+=======
+def _resource_path(rel):
+    # supports dev + PyInstaller
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, rel)
+
+def load_launcher_config():
+    cfg_path = _resource_path("config.json")
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+>>>>>>> df8695f161d9a80b428308b742127eb1a801c571
