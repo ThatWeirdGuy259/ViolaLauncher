@@ -1,0 +1,66 @@
+name: Build ViolaLauncher
+
+on:
+  push:
+    tags:
+      - 'v*'  # triggers workflow on tags like v1.0.1
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install pyinstaller requests certifi
+
+    - name: Build launcher
+      run: |
+        pyinstaller --noconfirm --onefile --noconsole src/viola_launcher.py
+
+    - name: Zip executable
+      run: |
+        mkdir output
+        powershell Compress-Archive -Path dist\viola_launcher.exe -DestinationPath output\ViolaLauncher-${GITHUB_REF_NAME}.zip
+
+    - name: Calculate SHA256
+      id: hash
+      run: |
+        $hash = Get-FileHash output\ViolaLauncher-${GITHUB_REF_NAME}.zip -Algorithm SHA256
+        Write-Output "SHA256=$($hash.Hash)" >> $GITHUB_ENV
+
+    - name: Update latest.json
+      run: |
+        $latestJson = @"
+{
+  "version": "${GITHUB_REF_NAME.Substring(1)}",
+  "url": "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/ViolaLauncher-${GITHUB_REF_NAME}.zip",
+  "sha256": "$env:SHA256",
+  "notes": "Automated build from GitHub Actions."
+}
+"@
+        Set-Content -Path latest.json -Value $latestJson
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: ${{ github.ref_name }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload ZIP to Release
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: output/ViolaLauncher-${GITHUB_REF_NAME}.zip
+        asset_name: ViolaLauncher-${GITHUB_REF_NAME}.zip
+        asset_content_type: application/zip
