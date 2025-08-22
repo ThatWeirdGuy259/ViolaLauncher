@@ -2,5 +2,5 @@
   "version": "1.0.1",
   "url": "https://github.com/ThatWeirdGuy259/ViolaLauncher/releases/download/v1.0.1/ViolaLauncher-v1.0.1.zip",
   "sha256": "52381C99DD79444F82250D68B906C203AACB998CDC0B5E6620A803A35A42B4C3",
-  "notes": "Bug fixes and minor improvements"
+  "notes": "First public release with auto-updater"
 }
