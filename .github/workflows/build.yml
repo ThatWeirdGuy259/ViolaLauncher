@@ -39,17 +39,16 @@ jobs:
 
     - name: Update latest.json
       run: |
-        $latestJson = @"
-{
-  "version": "${GITHUB_REF_NAME.Substring(1)}",
-  "url": "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/ViolaLauncher-${GITHUB_REF_NAME}.zip",
-  "sha256": "$env:SHA256",
-  "notes": "Automated build from GitHub Actions."
-}
-"@
-        Set-Content -Path latest.json -Value $latestJson
+        $json = '{
+          "version": "' + ${GITHUB_REF_NAME}.Substring(1) + '",
+          "url": "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/ViolaLauncher-${GITHUB_REF_NAME}.zip",
+          "sha256": "' + $env:SHA256 + '",
+          "notes": "Automated build from GitHub Actions."
+        }'
+        Set-Content latest.json -Value $json -Encoding UTF8
 
     - name: Create GitHub Release
+      id: create_release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ github.ref_name }}
