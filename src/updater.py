@@ -1,28 +1,17 @@
-import os
-import sys
-import time
-import zipfile
-import subprocess
-import requests
-import hashlib
-import io
+import os, requests, hashlib, zipfile, io, tempfile
 
 APP_NAME = "ViolaLauncher"
-VERSION = "1.0.27"
 MANIFEST_URL = "https://github.com/ThatWeirdGuy259/ViolaLauncher/releases/latest/download/latest.json"
-
 
 def get_app_dir():
     return os.path.join(os.getenv("LOCALAPPDATA"), APP_NAME)
-
 
 def sha256sum(data):
     h = hashlib.sha256()
     h.update(data)
     return h.hexdigest()
 
-
-def check_and_update():
+def check_and_update(progress_callback=None):
     try:
         r = requests.get(MANIFEST_URL, timeout=10)
         r.raise_for_status()
@@ -31,41 +20,41 @@ def check_and_update():
         print(f"[Updater] Could not check for updates: {e}")
         return False
 
-    latest_version = manifest["version"]
-    if latest_version <= VERSION:
-        print("[Updater] Already up to date.")
+    latest_version = manifest.get("version", "")
+    if latest_version == "":
+        print("[Updater] No version info found.")
         return False
 
-    print(f"[Updater] New version {latest_version} available. Downloading...")
+    print(f"[Updater] Latest version: {latest_version}")
 
-    try:
-        zip_data = requests.get(manifest["url"], timeout=30).content
-        if sha256sum(zip_data) != manifest["sha256"]:
-            print("[Updater] Hash mismatch! Aborting update.")
-            return False
+    # Go through each file in manifest
+    for file_info in manifest.get("files", []):
+        name = file_info.get("name")
+        url = file_info.get("url")
+        expected_hash = file_info.get("sha256")
 
-        # --- Wait for launcher to close ---
-        time.sleep(2)
+        if not name or not url or not expected_hash:
+            continue
 
-        app_dir = get_app_dir()
-        with zipfile.ZipFile(io.BytesIO(zip_data)) as z:
-            z.extractall(app_dir)
+        print(f"[Updater] Downloading {name}...")
+        try:
+            data = requests.get(url, timeout=30).content
+            if sha256sum(data) != expected_hash:
+                print(f"[Updater] Hash mismatch for {name}! Skipping...")
+                continue
 
-        print("[Updater] Update installed successfully.")
+            target_path = os.path.join(get_app_dir(), name)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, "wb") as f:
+                f.write(data)
 
-        # --- Relaunch the launcher ---
-        exe = os.path.join(app_dir, "viola_launcher.exe")
-        if not os.path.exists(exe):
-            exe = sys.executable  # fallback if running as script
-        subprocess.Popen([exe])
+            print(f"[Updater] {name} updated successfully.")
+            if progress_callback:
+                progress_callback(name)
 
-        return True
+        except Exception as e:
+            print(f"[Updater] Failed to update {name}: {e}")
+            continue
 
-    except Exception as e:
-        print(f"[Updater] Update failed: {e}")
-        return False
-
-
-if __name__ == "__main__":
-    success = check_and_update()
-    sys.exit(0 if success else 1)
+    print("[Updater] All files updated.")
+    return True

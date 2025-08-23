@@ -3,6 +3,12 @@ from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QLineEdit
 from PyQt6.QtGui import QPixmap, QFont, QPainterPath, QRegion, QCursor, QIcon, QPainter, QKeySequence
 from PyQt6.QtCore import Qt, QRectF, QThread, pyqtSignal, QTimer
+from updater import check_and_update
+
+def update_launcher():
+    check_and_update(progress_callback=lambda name: print(f"[Updater] {name} done"))
+
+threading.Thread(target=update_launcher, daemon=True).start()
 
 # ---------------- Paths & Config ----------------
 CONFIG_FILENAME = "config.json"
@@ -443,9 +449,11 @@ class ViolaLauncher(QWidget):
             try:
                 updater = os.path.join(app_dir(), "updater.py")
                 if os.path.exists(updater):
-                    # Run updater as a separate process
-                    subprocess.Popen([sys.executable, updater, path_or_err, app_dir()])
-                    self.close()  # quit launcher so updater can replace files
+                    # Run updater as a separate thread without closing the launcher
+                    threading.Thread(target=lambda: subprocess.run([sys.executable, updater, path_or_err, app_dir()]), daemon=True).start()
+                    self.update_overlay.setText("Update complete!")
+                    QTimer.singleShot(2000, self.update_overlay.hide)
+                    self.launch_button.setEnabled(True)
                 else:
                     print("Updater missing!")
                     self.update_overlay.setText("Update failed!")
