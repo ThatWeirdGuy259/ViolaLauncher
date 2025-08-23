@@ -29,7 +29,7 @@ jobs:
       # 4️⃣ Build launcher .exe
       - name: Build launcher
         run: |
-          pyinstaller --noconfirm --onefile --noconsole src/viola_launcher.py
+          pyinstaller --noconsole --windowed --onefile --name "Viola Launcher" --icon "src/assets/logo.ico" --add-data "src/assets/logo.ico;assets" --add-data "src/assets/logo.png;assets" --add-data "src/assets/background.png;assets" src/viola_launcher.py
 
       # 5️⃣ Zip the executable
       - name: Zip executable
