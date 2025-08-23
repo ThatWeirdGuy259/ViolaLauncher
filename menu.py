@@ -78,7 +78,7 @@ class ViolaLauncher(QWidget):
                 self.setWindowIcon(QIcon(path))
                 break
 
-        self.setWindowTitle("Viola Client")
+        self.setWindowTitle("Viola Launcher")
         self.setFixedSize(900, 600)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.apply_rounded_corners()
