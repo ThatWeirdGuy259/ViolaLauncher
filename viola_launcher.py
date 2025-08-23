@@ -1,4 +1,4 @@
-import sys, os, glob, json, requests, zipfile, shutil, tempfile, subprocess
+import sys, os, glob, json, requests, zipfile, shutil, tempfile, subprocess, hashlib
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton
 from PyQt6.QtGui import QPixmap, QFont, QPainterPath, QRegion, QCursor, QIcon
@@ -178,14 +178,26 @@ class ViolaLauncher(QWidget):
             data = r.json()
             latest_version = data.get("version")
             url = data.get("url")
+            expected_sha256 = data.get("sha256")
+
             if latest_version != self.CURRENT_VERSION:
                 self.launch_button.setEnabled(False)
                 self.update_overlay.setText("Updating… 0%")
                 self.update_overlay.show()
+
                 dest_zip = os.path.join(tempfile.gettempdir(), "update.zip")
                 self.update_thread = UpdateThread(url, dest_zip)
                 self.update_thread.progress.connect(self.update_progress)
-                self.update_thread.finished.connect(self.update_finished)
+
+                # Pass expected SHA256
+                self.update_thread.expected_sha256 = expected_sha256
+
+                def finished_wrapper(success, path):
+                    if success and hasattr(self.update_thread, 'expected_sha256'):
+                        self.expected_sha256 = self.update_thread.expected_sha256
+                    self.update_finished(success, path)
+
+                self.update_thread.finished.connect(finished_wrapper)
                 self.update_thread.start()
         except Exception as e:
             print("Failed to check updates:", e)
@@ -196,6 +208,12 @@ class ViolaLauncher(QWidget):
     def update_finished(self, success, path):
         if success and path:
             try:
+                # Verify SHA256
+                with open(path, "rb") as f:
+                    file_hash = hashlib.sha256(f.read()).hexdigest()
+                if file_hash.lower() != self.expected_sha256.lower():
+                    raise Exception("SHA256 mismatch!")
+
                 with zipfile.ZipFile(path, 'r') as zip_ref:
                     extract_path = os.path.dirname(sys.executable)
                     zip_ref.extractall(extract_path)
