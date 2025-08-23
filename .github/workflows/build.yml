@@ -29,13 +29,13 @@ jobs:
       # 4️⃣ Build launcher .exe
       - name: Build launcher
         run: |
-          pyinstaller --noconsole --windowed --onefile --name "Viola Launcher" --icon "src/assets/logo.ico" --add-data "src/assets/logo.ico;assets" --add-data "src/assets/logo.png;assets" --add-data "src/assets/background.png;assets" src/viola_launcher.py
+          pyinstaller --noconsole --windowed --onefile --name "ViolaLauncher" --icon "src/assets/logo.ico" --add-data "src/assets/logo.ico;assets" --add-data "src/assets/logo.png;assets" --add-data "src/assets/background.png;assets" src/viola_launcher.py
 
       # 5️⃣ Zip the executable
       - name: Zip executable
         run: |
           mkdir output
-          powershell Compress-Archive -Path '.\dist\Viola Launcher.exe' -DestinationPath output\ViolaLauncher-${{ github.ref_name }}.zip
+          powershell Compress-Archive -Path '.\dist\ViolaLauncher.exe' -DestinationPath output\ViolaLauncher-${{ github.ref_name }}.zip
 
       # 6️⃣ Calculate SHA256
       - name: Calculate SHA256

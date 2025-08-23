@@ -16,7 +16,7 @@
         {
             "label": "start",
             "type": "shell",
-            "command": "& '.\\dist\\Viola Launcher.exe'",
+            "command": "& '.\\dist\\ViolaLauncher.exe'",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
