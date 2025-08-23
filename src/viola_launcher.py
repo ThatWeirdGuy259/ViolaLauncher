@@ -257,7 +257,7 @@ class SettingsPage(QWidget):
 
 # ---------------- Main Launcher ----------------
 class ViolaLauncher(QWidget):
-    CURRENT_VERSION = "1.0.27"
+    CURRENT_VERSION = "1.0.0"
 
     def __init__(self):
         super().__init__()
