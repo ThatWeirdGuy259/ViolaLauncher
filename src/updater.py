@@ -1,7 +1,7 @@
 import os, requests, hashlib, zipfile, io, sys
 
 APP_NAME = "ViolaLauncher"
-VERSION = "1.0.27"  # current client version
+VERSION = "1.0.28"  # current client version
 MANIFEST_URL = "https://github.com/ThatWeirdGuy259/ViolaLauncher/releases/latest/download/latest.json"
 
 def get_app_dir():
