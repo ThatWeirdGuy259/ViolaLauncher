@@ -35,7 +35,7 @@ jobs:
       - name: Zip executable
         run: |
           mkdir output
-          powershell Compress-Archive -Path dist\viola_launcher.exe -DestinationPath output\ViolaLauncher-${{ github.ref_name }}.zip
+          powershell Compress-Archive -Path '.\dist\Viola Launcher.exe' -DestinationPath output\ViolaLauncher-${{ github.ref_name }}.zip
 
       # 6️⃣ Calculate SHA256
       - name: Calculate SHA256
