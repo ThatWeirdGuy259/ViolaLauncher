@@ -251,7 +251,7 @@ class SettingsPage(QWidget):
 
 # ---------------- Main Launcher ----------------
 class ViolaLauncher(QWidget):
-    CURRENT_VERSION = "1.0.28"
+    CURRENT_VERSION = "1.0.29"
 
     def __init__(self):
         super().__init__()
@@ -441,17 +441,18 @@ class ViolaLauncher(QWidget):
     def update_finished(self, success, path_or_err):
         if success and path_or_err and os.path.exists(path_or_err):
             try:
-                with zipfile.ZipFile(path_or_err, "r") as zip_ref:
-                    target_dir = app_dir()
-                    zip_ref.extractall(target_dir)
-                try:
-                    os.remove(path_or_err)
-                except Exception:
-                    pass
-                self.update_overlay.setText("Update complete!")
-                QTimer.singleShot(1000, self.restart_launcher)
+                updater = os.path.join(app_dir(), "updater.py")
+                if os.path.exists(updater):
+                    # Run updater as a separate process
+                    subprocess.Popen([sys.executable, updater, path_or_err, app_dir()])
+                    self.close()  # quit launcher so updater can replace files
+                else:
+                    print("Updater missing!")
+                    self.update_overlay.setText("Update failed!")
+                    QTimer.singleShot(2000, self.update_overlay.hide)
+                    self.launch_button.setEnabled(True)
             except Exception as e:
-                print("Update extraction failed:", e)
+                print("Failed to start updater:", e)
                 self.update_overlay.setText("Update failed!")
                 QTimer.singleShot(2000, self.update_overlay.hide)
                 self.launch_button.setEnabled(True)

@@ -1,16 +1,26 @@
-import os, requests, hashlib, zipfile, io, sys
+import os
+import sys
+import time
+import zipfile
+import subprocess
+import requests
+import hashlib
+import io
 
 APP_NAME = "ViolaLauncher"
-VERSION = "1.0.28"  # current client version
+VERSION = "1.0.29"
 MANIFEST_URL = "https://github.com/ThatWeirdGuy259/ViolaLauncher/releases/latest/download/latest.json"
 
+
 def get_app_dir():
-    return os.path.join(os.getenv('LOCALAPPDATA'), APP_NAME)
+    return os.path.join(os.getenv("LOCALAPPDATA"), APP_NAME)
+
 
 def sha256sum(data):
     h = hashlib.sha256()
     h.update(data)
     return h.hexdigest()
+
 
 def check_and_update():
     try:
@@ -34,12 +44,28 @@ def check_and_update():
             print("[Updater] Hash mismatch! Aborting update.")
             return False
 
+        # --- Wait for launcher to close ---
+        time.sleep(2)
+
+        app_dir = get_app_dir()
         with zipfile.ZipFile(io.BytesIO(zip_data)) as z:
-            z.extractall(get_app_dir())
+            z.extractall(app_dir)
 
         print("[Updater] Update installed successfully.")
+
+        # --- Relaunch the launcher ---
+        exe = os.path.join(app_dir, "viola_launcher.exe")
+        if not os.path.exists(exe):
+            exe = sys.executable  # fallback if running as script
+        subprocess.Popen([exe])
+
         return True
 
     except Exception as e:
         print(f"[Updater] Update failed: {e}")
         return False
+
+
+if __name__ == "__main__":
+    success = check_and_update()
+    sys.exit(0 if success else 1)
