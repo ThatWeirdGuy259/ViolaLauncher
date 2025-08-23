@@ -417,7 +417,7 @@ class ViolaLauncher(QWidget):
     def check_for_updates(self):
         try:
             r = requests.get(
-                "https://raw.githubusercontent.com/ThatWeirdGuy259/ViolaLauncher/main/latest.json",
+                "https://github.com/ThatWeirdGuy259/ViolaLauncher/releases/latest/download/latest.json",
                 timeout=5,
             )
             data = r.json()
