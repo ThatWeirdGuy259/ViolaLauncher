@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install pyinstaller requests certifi
+          pip install -r requirements.txt
 
       # 4️⃣ Build launcher .exe
       - name: Build launcher
