@@ -255,6 +255,7 @@ class SettingsPage(QWidget):
             print(f"Hotkey saved: {new_hk}")
             self.parent_launcher.rebind_hotkey(new_hk)
 
+
 # ---------------- Main Launcher ----------------
 class ViolaLauncher(QWidget):
     CURRENT_VERSION = "1.0.0"
