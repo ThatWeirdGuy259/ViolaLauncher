@@ -486,7 +486,7 @@ class ViolaLauncher(QWidget):
         """Check GitHub for latest release and start UpdateThread only if needed."""
         try:
             r = requests.get(
-                "https://github.com/ThatWeirdGuy259/ViolaLauncher/releases/latest/download/latest.json",
+                "https://github.com/ThatWeirdGuy259/ViolaLauncher/blob/main/latest.json",
                 timeout=5
             )
             data = r.json()
