@@ -14,8 +14,12 @@ jobs:
 
     steps:
       # 1️⃣ Checkout repository
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          ref: main        # makes sure you’re on main instead of detached HEAD
+          fetch-depth: 0   # makes sure full history is fetched (needed for tags/commits)
+
 
       # 2️⃣ Setup Python
       - name: Setup Python
