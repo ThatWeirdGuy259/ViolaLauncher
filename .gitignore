@@ -1,3 +1,19 @@
-/build
-/dist
-/*.spec
+# PyInstaller build folders
+/build/
+/dist/
+
+# PyInstaller spec file
+*.spec
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE/editor folders (optional)
+.vscode/
+.idea/
+
+# OS files (optional)
+.DS_Store
+Thumbs.db
