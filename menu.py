@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QMessage
 from PyQt6.QtGui import QPixmap, QFont, QPainterPath, QRegion, QCursor, QIcon
 from PyQt6.QtCore import Qt, QRectF
 
-CURRENT_VERSION = "1.0.0"  # must match your GitHub release tag (without "v")
+CURRENT_VERSION = "1.0.6"  # must match your GitHub release tag (without "v")
 
 class NewPage(QWidget):
     def __init__(self, parent_launcher=None):

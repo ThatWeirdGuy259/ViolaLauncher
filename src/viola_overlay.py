@@ -45,7 +45,7 @@ class NewPage(QWidget):
 
 # --- Launcher ---
 class ViolaLauncher(QWidget):
-    CURRENT_VERSION = "1.0.0"
+    CURRENT_VERSION = "1.0.6"
 
     def __init__(self):
         super().__init__()
