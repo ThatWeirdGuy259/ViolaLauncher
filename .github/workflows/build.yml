@@ -3,7 +3,7 @@ name: Build ViolaLauncher
 on:
   push:
     tags:
-      - 'v*'  # Trigger on version tags like v1.0.2
+      - 'v*'
 
 jobs:
   build:
@@ -13,65 +13,54 @@ jobs:
       pull-requests: write
 
     steps:
-      # 1. Checkout repository
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Python
+      # 2️⃣ Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      # 3. Install dependencies
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Build launcher .exe
-      - name: Build launcher
+      # 4️⃣ Clean old builds
+      - name: Clean old builds
+        shell: pwsh
         run: |
-          pyinstaller --noconsole --windowed --onefile \
-            --name "ViolaLauncher" \
-            --icon "src/assets/logo.ico" \
-            --add-data "src/assets/logo.ico;assets" \
-            --add-data "src/assets/logo.png;assets" \
-            --add-data "src/assets/background.png;assets" \
+          Remove-Item -Recurse -Force build, dist, output -ErrorAction SilentlyContinue
+
+      # 5️⃣ Build launcher
+      - name: Build launcher
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --noconsole `
+            --windowed `
+            --onefile `
+            --name "ViolaLauncher" `
+            --icon "src/assets/logo.ico" `
+            --add-data "src/assets/logo.ico;assets" `
+            --add-data "src/assets/logo.png;assets" `
+            --add-data "src/assets/background.png;assets" `
             src/viola_launcher.py
 
-      # 5. Zip the executable
+      # 6️⃣ Ensure output folder
+      - name: Ensure output folder
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path output
+
+      # 7️⃣ Zip executable
       - name: Zip executable
         shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path output
-          Compress-Archive -Path '.\dist\ViolaLauncher.exe' `
-                           -DestinationPath output\ViolaLauncher-${{ github.ref_name }}.zip `
-                           -Force
+        run: Compress-Archive -Path '.\dist\ViolaLauncher.exe' -DestinationPath "output\ViolaLauncher-${{ github.ref_name }}.zip" -Force
 
-      # 6. Calculate SHA256
-      - name: Calculate SHA256
-        id: hash
-        shell: pwsh
-        run: |
-          $hash = Get-FileHash "output\ViolaLauncher-${{ github.ref_name }}.zip" -Algorithm SHA256
-          Write-Output "SHA256=$($hash.Hash)" >> $GITHUB_ENV
-
-      # 7. Generate latest.json for auto-update
-      - name: Generate latest.json
-        shell: pwsh
-        run: |
-          $version = $env:GITHUB_REF_NAME.Substring(1)
-          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/ViolaLauncher-${{ github.ref_name }}.zip"
-          $sha256 = $env:SHA256
-          $latestJson = @{"version"=$version; "url"=$url; "sha256"=$sha256; "notes"="Automated build from GitHub Actions"} | ConvertTo-Json -Compress
-          Set-Content -Path latest.json -Value $latestJson -Encoding UTF8
-
-      # 8. List output folder
-      - name: List output folder
-        run: dir output
-
-      # 9. Create GitHub Release
+      # 8️⃣ Create GitHub Release and upload zip
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -82,11 +71,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
-      # 10. Upload latest.json as release asset
-      - name: Upload latest.json
-        uses: softprops/action-gh-release@v2
+      # 9️⃣ Generate latest.json after release exists
+      - name: Generate latest.json
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/ViolaLauncher-${{ github.ref_name }}.zip"
+          $sha256 = (Get-FileHash "output\ViolaLauncher-${{ github.ref_name }}.zip" -Algorithm SHA256).Hash
+
+          $latestJson = @{
+              version = $version
+              url     = $url
+              sha256  = $sha256
+              notes   = "Automated build from GitHub Actions."
+          } | ConvertTo-Json -Compress
+
+          Set-Content -Path latest.json -Value $latestJson -Encoding UTF8
+
+      # 🔟 Commit and push latest.json
+      - name: Commit and push latest.json
+        uses: EndBug/add-and-commit@v9
         with:
-          tag_name: ${{ github.ref_name }}
-          files: latest.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          author_name: "Viola Bot"
+          author_email: "viola-bot@example.com"
+          message: "Update latest.json for ${{ github.ref_name }}"
+          add: latest.json
