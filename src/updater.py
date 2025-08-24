@@ -5,7 +5,12 @@ MANIFEST_URL = "https://github.com/ThatWeirdGuy259/ViolaLauncher/releases/latest
 CONFIG_FILENAME = "config.json"
 
 def get_app_dir():
-    return os.path.join(os.getenv("LOCALAPPDATA") or os.path.expanduser("~"), APP_NAME)
+    """Return a writable folder for updates and config."""
+    if getattr(sys, "frozen", False):
+        path = os.path.join(os.getenv("LOCALAPPDATA") or os.path.expanduser("~"), APP_NAME)
+        os.makedirs(path, exist_ok=True)
+        return path
+    return os.path.dirname(os.path.abspath(__file__))
 
 def config_path():
     return os.path.join(get_app_dir(), CONFIG_FILENAME)
@@ -30,12 +35,12 @@ def write_json(path, data):
         return False
 
 def sha256sum(data):
-    import hashlib
     h = hashlib.sha256()
     h.update(data)
     return h.hexdigest()
 
 def check_and_update(progress_callback=None):
+    """Check for updates and apply them if needed."""
     try:
         r = requests.get(MANIFEST_URL, timeout=10)
         r.raise_for_status()
@@ -49,9 +54,17 @@ def check_and_update(progress_callback=None):
         print("[Updater] No version info found.")
         return False
 
-    print(f"[Updater] Latest version: {latest_version}")
+    # Load installed version
+    cfg = read_json(config_path(), {})
+    installed_version = cfg.get("installed_version", "0.0.0")
 
-    # Download each file
+    if latest_version == installed_version:
+        print(f"[Updater] No update needed. Installed version: {installed_version}")
+        return False
+
+    print(f"[Updater] Updating from {installed_version} to {latest_version}...")
+
+    # Download and replace files
     for file_info in manifest.get("files", []):
         name = file_info.get("name")
         url = file_info.get("url")
@@ -59,7 +72,6 @@ def check_and_update(progress_callback=None):
         if not name or not url or not expected_hash:
             continue
 
-        print(f"[Updater] Downloading {name}...")
         try:
             data = requests.get(url, timeout=30).content
             if sha256sum(data) != expected_hash:
@@ -71,27 +83,25 @@ def check_and_update(progress_callback=None):
             with open(target_path, "wb") as f:
                 f.write(data)
 
-            print(f"[Updater] {name} updated successfully.")
             if progress_callback:
                 progress_callback(name)
+            print(f"[Updater] {name} updated successfully.")
 
         except Exception as e:
             print(f"[Updater] Failed to update {name}: {e}")
-            continue
 
     # Update version in config
-    cfg = read_json(config_path(), {})
     cfg["installed_version"] = latest_version
     write_json(config_path(), cfg)
-    print("[Updater] All files updated and version recorded.")
+    print("[Updater] Update complete!")
 
-    return True
+    # Relaunch the launcher without triggering another update
+    launcher_path = os.path.join(get_app_dir(), "ViolaLauncher.exe")
+    if os.path.exists(launcher_path):
+        subprocess.Popen([launcher_path, "--skip-update"])
+        sys.exit(0)
 
-# Optional: auto-relaunch after update
 if __name__ == "__main__":
-    success = check_and_update()
-    if success:
-        print("[Updater] Relaunching launcher...")
-        launcher_path = os.path.join(get_app_dir(), "ViolaLauncher.exe")
-        if os.path.exists(launcher_path):
-            subprocess.Popen([launcher_path, "--skip-update"])
+    # Only run updater if --skip-update not provided
+    if "--skip-update" not in sys.argv:
+        check_and_update()

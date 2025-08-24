@@ -9,7 +9,7 @@ REM --- Recreate output folder ---
 mkdir output
 
 REM --- Build launcher ---
-python -m PyInstaller ^
+pyinstaller ^
     --noconsole ^
     --windowed ^
     --onefile ^
