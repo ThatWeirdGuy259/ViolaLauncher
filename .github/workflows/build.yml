@@ -10,6 +10,14 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 0️⃣ Clean old builds
+      - name: Clean old builds
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force dist, build -ErrorAction SilentlyContinue
+          Remove-Item -Force ViolaLauncher.spec -ErrorAction SilentlyContinue
+          if (Test-Path output) { Remove-Item -Recurse -Force output }
+
       # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -29,7 +37,12 @@ jobs:
       # 4️⃣ Build launcher .exe
       - name: Build launcher
         run: |
-          pyinstaller --noconsole --windowed --onefile --name "ViolaLauncher" --icon "src/assets/logo.ico" --add-data "src/assets/logo.ico;assets" --add-data "src/assets/logo.png;assets" --add-data "src/assets/background.png;assets" src/viola_launcher.py
+          pyinstaller --noconsole --windowed --onefile --name "ViolaLauncher" \
+            --icon "src/assets/logo.ico" \
+            --add-data "src/assets/logo.ico;assets" \
+            --add-data "src/assets/logo.png;assets" \
+            --add-data "src/assets/background.png;assets" \
+            src/viola_launcher.py
 
       # 5️⃣ Zip the executable
       - name: Zip executable
