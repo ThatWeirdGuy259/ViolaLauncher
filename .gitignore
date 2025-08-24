@@ -1,19 +1,25 @@
-# PyInstaller build folders
-/build/
-/dist/
-
-# PyInstaller spec file
-*.spec
-
-# Python cache
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 
-# IDE/editor folders (optional)
+# PyInstaller
+build/
+dist/
+*.spec
+output/
+
+# VS Code / IDE
 .vscode/
-.idea/
+*.code-workspace
 
-# OS files (optional)
+# OS files
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+
+# Configuration files (optional, if you don’t want to push your local config)
+config.json
