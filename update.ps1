@@ -1,58 +1,69 @@
-param(
-    [string]$Repo = "ThatWeirdGuy259/ViolaLauncher",
-    [string]$CurrentVersionFile = "version.txt",
-    [string]$UpdateDir = "updates",
-    [string]$DistDir = "dist"
-)
+import os
+import sys
+import requests
+import hashlib
+import zipfile
+import io
+import json
 
-# Ensure updates directory exists
-if (-not (Test-Path $UpdateDir)) {
-    New-Item -ItemType Directory -Path $UpdateDir | Out-Null
-}
+APP_NAME = "ViolaLauncher"
+MANIFEST_URL = "https://github.com/ThatWeirdGuy259/ViolaLauncher/releases/latest/download/latest.json"
 
-# Read current version
-$currentVersion = ""
-if (Test-Path $CurrentVersionFile) {
-    $currentVersion = Get-Content $CurrentVersionFile -Raw
-}
+def get_app_dir():
+    return os.path.join(os.getenv("LOCALAPPDATA"), APP_NAME)
 
-# Fetch latest.json from GitHub release
-$latestUrl = "https://github.com/$Repo/releases/latest/download/latest.json"
-Write-Output "Fetching $latestUrl ..."
-try {
-    $latest = Invoke-RestMethod -Uri $latestUrl
-} catch {
-    Write-Error "Failed to fetch update info."
-    exit 1
-}
+def sha256sum(data):
+    h = hashlib.sha256()
+    h.update(data)
+    return h.hexdigest()
 
-$latestVersion = $latest.version
-$downloadUrl   = $latest.url
-$sha256        = $latest.sha256
+def check_and_update(progress_callback=None):
+    """
+    Run the updater in the background.
+    progress_callback(percent) can be used to update UI if provided.
+    """
+    try:
+        r = requests.get(MANIFEST_URL, timeout=10)
+        r.raise_for_status()
+        manifest = r.json()
+    except Exception as e:
+        print(f"[Updater] Could not fetch latest.json: {e}")
+        return False
 
-if ($latestVersion -eq $currentVersion) {
-    Write-Output "Already up to date (v$currentVersion)."
-    exit 0
-}
+    latest_version = manifest.get("version")
+    app_dir = get_app_dir()
+    os.makedirs(app_dir, exist_ok=True)
 
-Write-Output "New version available: $latestVersion (current: $currentVersion)"
-$zipPath = Join-Path $UpdateDir ("ViolaLauncher-$latestVersion.zip")
+    try:
+        for file_info in manifest.get("files", []):
+            name = file_info["name"]
+            url = file_info["url"]
+            expected_hash = file_info.get("sha256")
 
-# Download new version
-Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath
+            print(f"[Updater] Downloading {name} ...")
+            resp = requests.get(url, timeout=30)
+            resp.raise_for_status()
+            data = resp.content
 
-# Verify SHA256
-$hash = Get-FileHash $zipPath -Algorithm SHA256
-if ($hash.Hash -ne $sha256) {
-    Write-Error "SHA256 mismatch! Update aborted."
-    exit 1
-}
+            if expected_hash and sha256sum(data) != expected_hash:
+                print(f"[Updater] Hash mismatch for {name}! Skipping file.")
+                continue  # Skip corrupted file, don't abort entire update
 
-# Extract update into dist/
-Expand-Archive -Path $zipPath -DestinationPath $DistDir -Force
+            dest_path = os.path.join(app_dir, name)
+            with open(dest_path, "wb") as f:
+                f.write(data)
 
-# Save version
-$latestVersion | Set-Content $CurrentVersionFile
+            # Extract if zip
+            if name.lower().endswith(".zip"):
+                with zipfile.ZipFile(io.BytesIO(data)) as z:
+                    z.extractall(app_dir)
+                print(f"[Updater] {name} extracted.")
 
-Write-Output "Updated to v$latestVersion successfully."
-exit 0
+            print(f"[Updater] {name} updated successfully.")
+
+        print(f"[Updater] Update check finished. Latest version: {latest_version}")
+        return True
+
+    except Exception as e:
+        print(f"[Updater] Update failed: {e}")
+        return False

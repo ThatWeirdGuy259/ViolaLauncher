@@ -11,9 +11,10 @@ python -m PyInstaller ^
     --onefile ^
     --name "ViolaLauncher" ^
     --icon "src/assets/logo.ico" ^
-    --add-data "src/assets/logo.ico;assets" ^
-    --add-data "src/assets/logo.png;assets" ^
-    --add-data "src/assets/background.png;assets" ^
+    --add-data "src/assets;assets" ^
+    --add-data "src/updater.py;." ^
+    --hidden-import keyboard ^
     src/viola_launcher.py
 
 pause
+
